@@ -6,6 +6,9 @@
 
     .\vcd-getmetrics.ps1 > out.json
 
+    An explanation on the meaning of the values in the output can be found on VMware's documentation here:
+    https://pubs.vmware.com/vca/index.jsp?topic=%2Fcom.vmware.vcloud.api.doc_56%2FGUID-A54D67F6-F608-4096-87AE-B01A4E526052.html
+
 #>
 
 import-module VMware.VimAutomation.Cloud
