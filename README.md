@@ -6,7 +6,12 @@ These scripts are under continous development and provided "as is". Therefore no
 
 ## Sub-projects
 
+### vcd-metricsgetter
+- Technology: PowerShell (with PowerCLI libraries)
+- Runs on: DCS+, DCS, any other provider running vCloudDirector
+- Howto: Edit the variables at the beginning of [the script](vcd-metricsgetter/vcd-getmetrics.ps1) and afterwards run it on any PowerShell terminal. The VMware libraries must be installed first, please refer to the [DCS+ Guide](https://dcsplusguide.scapp.io/ug/vcloud-director-api.html) for further information about this.
+
 ### vcd-egw-syslogsetter
 - Technology: bash Shell & curl
 - Runs on: DCS+, DCS, any other provider running vCloudDirector 8.20
-- Howto: Edit the variable at the beginning of [the script](vcd-egw-syslogsetter/setsyslogserver.sh) and afterwards run it on any bash-Terminal with curl installed. At the end, the output of the configuration task submission to the API is being dumped. Unfortunately, it is still not possible to retrieve through the API that the setting was properly applied. Please go to the vCloudDirector Web UI, then to the properties of the affected EdgeGateway and look at the tab "Syslog Server Settings". Please also note, that the "Synchronize Syslog Server Settings" function will rollback your configuration (e.g no syslog server set at all!)
+- Howto: Edit the variables at the beginning of [the script](vcd-egw-syslogsetter/setsyslogserver.sh) and afterwards run it on any bash-Terminal with curl installed. At the end, the output of the configuration task submission to the API is being dumped. Unfortunately, it is still not possible to retrieve through the API that the setting was properly applied. Please go to the vCloudDirector Web UI, then to the properties of the affected EdgeGateway and look at the tab "Syslog Server Settings". Please also note, that the "Synchronize Syslog Server Settings" function will rollback your configuration (e.g no syslog server set at all!)
