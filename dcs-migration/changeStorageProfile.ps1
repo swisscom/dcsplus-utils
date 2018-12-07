@@ -27,11 +27,11 @@
 	# change storage profile of all VMs in a specific OvDC
 	.\changeVmStorageProfile.ps1 -ApiEndpoint my.vcloud.com -User MyApiUser -Password MyPassword -Organization MyOrganization -StorageType 'Fast Storage' -VdcName MyVdc
 	.Example
-	# change storage profile of all VMs in a specific OvDC which are in a vApp starting with MyVApp
+	# change storage profile of all VMs which are in a vApp starting with MyVApp
 	.\changeVmStorageProfile.ps1 -ApiEndpoint my.vcloud.com -User MyApiUser -Password MyPassword -Organization MyOrganization -StorageType 'Fast Storage' -VdcName MyVdc -VAppName 'MyVApp*'
 	.Example
-	# change storage profile of all VMs in a specific OvDC using a specific API-Version
-	.\changeVmStorageProfile.ps1 -ApiEndpoint my.vcloud.com -User MyApiUser -Password MyPassword -Organization MyOrganization -StorageType 'Fast Storage' -VdcName MyVdc -ApiVersion 27.0
+	# change storage profile of all VMs inthe vApp with the name MyVApp in DCS classic
+	.\changeVmStorageProfile.ps1 -ApiEndpoint my.oldvcloud.com -User MyApiUser -Password MyPassword -Organization MyOrganization -StorageType 'Migration Storage' -VdcName MyVdc -VAppName 'MyVApp' -ApiVersion 27.0
 #>
 # ######################################################################
 # ScriptName:   changeVmStorageProfile.ps1
@@ -59,7 +59,7 @@
 	[String]$Organization,
     [Parameter(Mandatory = $true)]
     [ValidateSet('Fast Storage','Fast Storage with Backup',
-    'Ultra Fast Storage','Ultra Fast Storage with Backup')]
+    'Ultra Fast Storage','Ultra Fast Storage with Backup','Migration Storage')]
     [String]$StorageType,
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
@@ -75,7 +75,7 @@
 Begin {
     # #################################### Import ##############################
     #region Import
-    $modules = @('.\Modules\vCloudDirectorREST');
+    $modules = @('vCloudDirectorREST');
     foreach ($module in $modules) {
         if (Get-Module | Where-Object {$_.Name -eq $module}) {
             # Module already imported. Do nothing.
@@ -125,10 +125,11 @@ Process {
         Write-Debug "$fn | $($storageprofiles.InnerXml)"
 
         ### get target storage profile
-        if($StorageType -eq 'Fast Storage'){$storageProfileName = '^Fast Storage [AB]{1,2}(( Mirrored)?)(?:(?!.+with Backup))'}
-        if($StorageType -eq 'Fast Storage with Backup'){$storageProfileName = '^Fast Storage [AB]{1,2}(( Mirrored)?) with Backup'}
-        if($StorageType -eq 'Ultra Fast Storage'){$storageProfileName = 'Ultra Fast Storage [AB]{1,2}(( Mirrored)?)(?:(?!.+with Backup))'}
-        if($StorageType -eq 'Ultra Fast Storage with Backup'){$storageProfileName = '^Ultra Fast Storage [AB]{1,2}(( Mirrored)?) with Backup'}
+        if($StorageType -eq 'Fast Storage'){$storageProfileName = '^\bFast Storage [AB]{1,2}(( Mirrored)?)(?:(?!.+with Backup))\b'}
+        if($StorageType -eq 'Fast Storage with Backup'){$storageProfileName = '^\bFast Storage [AB]{1,2}(( Mirrored)?) with Backup\b'}
+        if($StorageType -eq 'Ultra Fast Storage'){$storageProfileName = '^\bUltra Fast Storage [AB]{1,2}(( Mirrored)?)(?:(?!.+with Backup))\b'}
+        if($StorageType -eq 'Ultra Fast Storage with Backup'){$storageProfileName = '^\bUltra Fast Storage [AB]{1,2}(( Mirrored)?) with Backup\b'}
+        if($StorageType -eq 'Migration Storage'){$storageProfileName = '^\bMigration Storage(2|3)?\b'}
         Write-Verbose " $fn | search target storage profile"
         $storageprofiles.Vdc.VdcStorageProfiles.VdcStorageProfile | Where{($_.name -match $storageProfileName)}| %{
             $targetStorageprofile = $_
@@ -139,18 +140,28 @@ Process {
         $vmList = @{};
         Write-Host "$fn | getting VMs"
         if($VAppName){
-            Write-Verbose "$fn | get all VMs in target vApp $VAppName on migration storage."
-            $getVmsURI = "https://$ApiEndPoint/api/query?type=vm&pageSize=$pageSize&filter=containerName==$VAppName;storageProfileName==Migration%20Storage"
+            if($StorageType -eq 'Migration Storage'){
+                Write-Verbose "$fn | get all VMs in target vApp $VAppName in vDC $VdcName"
+                $getVmsURI = "https://$ApiEndPoint/api/query?type=vm&pageSize=$pageSize&filter=containerName==$VAppName;vdc==$vdcUri"
+            }else{
+                Write-Verbose "$fn | get all VMs in target vApp $VAppName on migration storage."
+                $getVmsURI = "https://$ApiEndPoint/api/query?type=vm&pageSize=$pageSize&filter=containerName==$VAppName;vdc==$vdcUri;storageProfileName==Migration%20Storage"
+            }
         }else{
-            Write-Verbose "$fn | get all VMs in target vdc $VdcName on migration Storage"
-            $getVmsURI = "https://$ApiEndPoint/api/query?type=vm&pageSize=$pageSize&filter=storageProfileName==Migration%20Storage;vdc==$vdcUri"
+            if($StorageType -eq 'Migration Storage'){
+                Write-Verbose "$fn | get all VMs in target vdc $VdcName"
+                $getVmsURI = "https://$ApiEndPoint/api/query?type=vm&pageSize=$pageSize&filter=vdc==$vdcUri"
+            }else{
+                Write-Verbose "$fn | get all VMs in target vdc $VdcName on migration Storage"
+                $getVmsURI = "https://$ApiEndPoint/api/query?type=vm&pageSize=$pageSize&filter=vdc==$vdcUri;storageProfileName==Migration%20Storage"
+            }
         }
         
         [xml]$vmRecords = Invoke-VCDRestRequest -URI $getVmsURI -Method 'Get' -ApiVersion $ApiVersion -Verbose:$VerbosePreference -Debug:$DebugPreference
         $total = $vmRecords.QueryResultRecords.total
         
         if($total -gt 0){
-            Write-Host "$fn | $total VMs found on Migration Storage" 
+            Write-Host "$fn | $total VMs found to change Storage Profile" 
             $pages = [Math]::Ceiling($total/$pageSize)
             Write-Verbose "$fn | $pages Pages to check"
             if($pages -gt 1){
@@ -163,15 +174,15 @@ Process {
                 }
             }else{
                 foreach($vm in $vmRecords.QueryResultRecords.VmRecord){
-                    $vmList.Add($vm.name, $vm.href)
+                    $vmList.Add($vm.href, $vm.name)
                 }
             }
         
             # change storage profile of selected VMs
             $startDate = Get-Date -Format o
             foreach($vm in $vmList.GetEnumerator()){
-                Write-Host "$fn | change storage profile of VM: $($vm.Key), $($vm.Value) to $targetStorageProfile"
-                Set-VmStorageProfile -vmUri $vm.Value -targetStorageprofileName $targetStorageprofile.name -targetStorageprofileHref $targetStorageprofile.href -AllDisks -Verbose:$VerbosePreference -Debug:$DebugPreference
+                Write-Host "$fn | change storage profile of VM: $($vm.Key), $($vm.Value) to $($targetStorageProfile.name)"
+                Set-VmStorageProfile -vmUri $vm.Key -targetStorageprofileName $targetStorageprofile.name -targetStorageprofileHref $targetStorageprofile.href -AllDisks -Verbose:$VerbosePreference -Debug:$DebugPreference
                 #Write-Host $result.RawContent
             }
             ### check for running Tasks
