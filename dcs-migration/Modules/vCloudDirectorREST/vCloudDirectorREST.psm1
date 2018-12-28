@@ -2,7 +2,7 @@
         .SYNOPSIS
         Swisscom Module for vCloud Director REST API
         .DESCRIPTION
-        This Module contains functions to automate tasks after the Migration using vCloud Director REST API
+        This Module contains functions to automate tasks before and after the Migration using vCloud Director REST API
 #>
 # ######################################################################
 # ScriptName:   vcloud_director.psm1
@@ -158,7 +158,7 @@ Function Set-VmStorageProfile{
   set storage profile of a VM
 
  .Description
-  Set a VM's default storage profile to the specified storage profile. And sets all Disks of a VM to "Use VM default" if parameter AllDisks is set
+  Set a VM's default storage profile to the specified storage profile.
 
  .Parameter VmUri
   a VM's URI
@@ -189,34 +189,45 @@ Param(
 )
     [String] $fn = $MyInvocation.MyCommand.Name
 
-    [xml]$vmDetails = Invoke-VCDRestRequest -URI $VmUri -Method 'Get'
+    [xml]$vmDetails = Invoke-VCDRestRequest -URI $VmUri -Method 'Get' -Verbose:$VerbosePreference -Debug:$DebugPreference
+
+    [System.Xml.XmlNamespaceManager] $nsm = new-object System.Xml.XmlNamespaceManager $vmDetails.NameTable
+    $nsm.AddNamespace("vcloud", "http://www.vmware.com/vcloud/v1.5") 
+    $nsm.AddNamespace("rasd", $vmDetails.Vm.GetNamespaceOfPrefix("rasd"))
+    $node = $vmDetails.SelectSingleNode("//*/rasd:HostResource[@vcloud:storageProfileOverrideVmDefault = 'true']", $nsm)
+
     Write-Debug "$fn | `n====================== VM details original ======================
                 `n$($vmDetails.innerXml)
                 `n====================== VM details original ======================"
     $vmDetails.Vm.StorageProfile.href = $TargetStorageprofileHref
     $vmDetails.Vm.StorageProfile.name = $TargetStorageprofileName
-    
-    Write-Debug "$fn | `n====================== VM details modified ======================
-                `n$($vmDetails.innerXml)
-                `n====================== VM details modified ======================"
-    Write-Host "$fn | migrate VM: $($vmDetails.Vm.name) to $($TargetStorageprofileName)"
-    [xml]$result = Invoke-VCDRestRequest -URI $VmUri -Method 'Put' -Body $vmDetails.InnerXml -ContentType 'application/vnd.vmware.vcloud.vm+xml'
-    if($AllDisks.IsPresent){
-        Wait-VCDTask -TaskUri $result.Task.href
-        [xml]$diskDetails = Invoke-VCDRestRequest -URI "$VmUri/virtualHardwareSection/disks" -Method 'Get'
-        Write-Debug "$fn | `n====================== Disk details original ======================
-                `n$($diskDetails.innerXml)
-                `n====================== Disk details original ======================"
-        Write-Verbose "$fn | AllDsiks selected - Setting attribute storageProfileOverrideVmDefault of all disks to false"
-        foreach($item in $diskDetails.RasdItemsList.Item){
+    if($AllDisks.IsPresent -and $node){
+        foreach($item in $vmDetails.VM.VirtualHardwareSection.Item){
             if($item.Description -eq "Hard Disk"){
                 $item.HostResource.storageProfileOverrideVmDefault = "false"
             }
         }
-        Write-Debug "$fn | `n====================== Disk details modified ======================
-                `n$($diskDetails.innerXml)
-                `n====================== Disk details modified ======================"
-        $response = Invoke-VCDRestRequest -URI "$VmUri/virtualHardwareSection/disks" -Method 'Put' -Body $diskDetails.InnerXml -ContentType 'application/vnd.vmware.vcloud.rasdItemsList+xml'
+    }
+    
+    Write-Debug "$fn | `n====================== VM details modified ======================
+                `n$($vmDetails.innerXml)
+                `n====================== VM details modified ======================"
+    # if API version is 29.0 or higher storage profile of vm and disk can be set using /action/reconfigureVm URI
+    if($Global:vcloud.ApiVersion -ge 29.0){
+        Write-Host "$fn | migrate VM: $($vmDetails.Vm.name) to $($TargetStorageprofileName)"
+        $response = Invoke-VCDRestRequest -URI "$VmUri/action/reconfigureVm" -Method 'Post' -Body $vmDetails.InnerXml -ContentType 'application/vnd.vmware.vcloud.vm+xml' -Verbose:$VerbosePreference -Debug:$DebugPreference
+    }
+    # if API version is less than 29.0 storage profile of the VM and the disks need to be set separately.
+    else{
+        Write-Host "$fn | migrate VM: $($vmDetails.Vm.name) to $($TargetStorageprofileName)"
+        Write-Verbose "$fn | setting VM default storage"
+        $response = Invoke-VCDRestRequest -URI $VmUri -Method 'Put' -Body $vmDetails.InnerXml -ContentType 'application/vnd.vmware.vcloud.vm+xml' -Verbose:$VerbosePreference -Debug:$DebugPreference
+        if($node){
+            Write-Verbose "$fn | setting disks to 'Use VM default'"
+            [xml]$task = $response.Content
+            Wait-VCDTask -TaskUri $task.Task.href
+            $response = Invoke-VCDRestRequest -URI "$VmUri/action/reconfigureVm" -Method 'Post' -Body $vmDetails.InnerXml -ContentType 'application/vnd.vmware.vcloud.vm+xml' -Verbose:$VerbosePreference -Debug:$DebugPreference
+        }
     }
     $response
 }

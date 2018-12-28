@@ -1,9 +1,9 @@
 <#
     .SYNOPSIS
-	Share a vApp with current API-User
+	Shares selected vApps with current API-User
     
     .DESCRIPTION
-    This Script searches all vApps or those matching the VAppName and shares the vApp with the current API-User.
+    This Script searches all vApps or those matching the parameter VAppNamefilter and shares them vApp with the current API-User.
 	The Permission set for the API-User is FullControl.
     
     .Parameter ApiEndpoint
@@ -40,7 +40,7 @@
 [CmdletBinding(
      DefaultParameterSetName='Default',
      ConfirmImpact = 'Low',
-     HelpURI = 'https://github.com/swisscom/dcsplus-utils/blob/master/README.md'
+     HelpURI = 'https://github.com/swisscom/dcsplus-utils/blob/master/dcs-migration/README.md'
 )]
  Param(
     [Parameter(Mandatory = $true)]
@@ -110,7 +110,7 @@ Begin {
 Process {
     # #################################### Main ##############################
     #region Main
-   Write-Host $fn "CALL."
+   Write-Host "$fn | CALL."
     try {
         ### get vApps
         $vappList = @{};

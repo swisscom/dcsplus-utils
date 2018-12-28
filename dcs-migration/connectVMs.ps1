@@ -1,10 +1,10 @@
 <#
     .SYNOPSIS
-	Add network adapter to VM and connect to specified network
+	Add a network adapter to the VM and connect to specified network
     
     .DESCRIPTION
-    This Script searches all VMs in a OvDC and adds a primary network adapter if it has no network adapter. The primary network adapter will be
-    connected with the specified network if not already connected with a network. IP will be assigned from the network satic IP Pool
+    This Script searches all VMs in an OvDC and adds a primary network adapter if it has no network adapter. The primary network adapter will be
+    connected with the specified network if not already connected with a network. IP will be assigned from the networks satic IP Pool
 	VMs can be further filtered by providing an additional vApp name.
     
     .Parameter ApiEndpoint
@@ -33,14 +33,15 @@
 #>
 # ######################################################################
 # ScriptName:   changeVAppPermission.ps1
-# Description: 	Swisscom Script to change permission of vApps
+# Description: 	Swisscom Script to add a network adapter and connect it 
+#               with the specified network.
 # Created by: 	
 # ######################################################################
  
 [CmdletBinding(
      DefaultParameterSetName='Default',
      ConfirmImpact = 'Low',
-     HelpURI = 'https://github.com/swisscom/dcsplus-utils/blob/master/README.md'
+     HelpURI = 'https://github.com/swisscom/dcsplus-utils/blob/master/dcs-migration/README.md'
 )]
  Param(
     #Mandatory Params without default values used for this script

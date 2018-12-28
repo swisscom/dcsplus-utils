@@ -1,9 +1,9 @@
  <#
     .SYNOPSIS
-	Move VMs from Migration Storage to a targe storage profile
+	Move VMs to a target storage profile
     
     .DESCRIPTION
-    This Script searches all VMs in a OvDC and moves them from "Migration Storage" to a specified storage profile.
+    This Script searches all VMs in a OvDC and moves them to the specified storage profile.
 	VMs can be further filtered by providing an additional vApp name.
     
     .Parameter ApiEndpoint
@@ -25,23 +25,23 @@
 
 	.Example
 	# change storage profile of all VMs in a specific OvDC
-	.\changeVmStorageProfile.ps1 -ApiEndpoint my.vcloud.com -User MyApiUser -Password MyPassword -Organization MyOrganization -StorageType 'Fast Storage' -VdcName MyVdc
+	.\changeStorageProfile.ps1 -ApiEndpoint my.vcloud.com -User MyApiUser -Password MyPassword -Organization MyOrganization -StorageType 'Fast Storage' -VdcName MyVdc
 	.Example
 	# change storage profile of all VMs which are in a vApp starting with MyVApp
-	.\changeVmStorageProfile.ps1 -ApiEndpoint my.vcloud.com -User MyApiUser -Password MyPassword -Organization MyOrganization -StorageType 'Fast Storage' -VdcName MyVdc -VAppName 'MyVApp*'
+	.\changeStorageProfile.ps1 -ApiEndpoint my.vcloud.com -User MyApiUser -Password MyPassword -Organization MyOrganization -StorageType 'Fast Storage' -VdcName MyVdc -VAppName 'MyVApp*'
 	.Example
 	# change storage profile of all VMs inthe vApp with the name MyVApp in DCS classic
-	.\changeVmStorageProfile.ps1 -ApiEndpoint my.oldvcloud.com -User MyApiUser -Password MyPassword -Organization MyOrganization -StorageType 'Migration Storage' -VdcName MyVdc -VAppName 'MyVApp' -ApiVersion 27.0
+	.\changeStorageProfile.ps1 -ApiEndpoint my.oldvcloud.com -User MyApiUser -Password MyPassword -Organization MyOrganization -StorageType 'Migration Storage' -VdcName MyVdc -VAppName 'MyVApp' -ApiVersion 27.0
 #>
 # ######################################################################
 # ScriptName:   changeVmStorageProfile.ps1
-# Description: 	Swisscom Script to move VMs from Migration Storage to a targe storage profile
+# Description: 	Swisscom Script to move VMs to a target storage profile
 # Created by: 	
 # ######################################################################
  
  [CmdletBinding(
      ConfirmImpact = 'Low',
-     HelpURI = 'https://github.com/swisscom/dcsplus-utils/blob/master/README.md'
+     HelpURI = 'https://github.com/swisscom/dcsplus-utils/blob/master/dcs-migration/README.md'
 )]
  Param(
     #Mandatory Params without default values used for this script
@@ -110,7 +110,7 @@ Begin {
 Process {
     # #################################### Main ##############################
     #region Main
-    Write-Host $fn "CALL."
+    Write-Host "$fn | CALL."
     try {
         Write-Host "$fn | getting storage profile of target vdc $VdcName"
         ### get target vdc
@@ -192,13 +192,13 @@ Process {
             Wait-OrgTasks -taskListUri $taskUri
             Write-Host "$fn | Storage Migration of all selected VMs finished"
         }else{
-            Write-Error "$fn | No VMs found on Migration Storage"
+            Write-Error "$fn | No VMs found to change storage profile"
         }
         
         #endregion Main
         # ######################################################################
     }catch {
-        Write-Error "$fn | Move VMs from Migration Storage to a targe storage profile was failed!"
+        Write-Error "$fn | Move VMs to a target storage profile was failed!"
 		Write-Host "Exception: "$_.Exception.Message
     }
 } # Process
